@@ -2,10 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from openpyxl.styles import Border, Side, Font, Alignment
-from openpyxl.utils import get_column_letter\
-
-st.write("NEW VERSION LOADED - TEST 001")
-
+from openpyxl.utils import get_column_letter
 
 
 # =========================================================
@@ -134,7 +131,7 @@ if uploaded_file is None:
 
 final_exam_name = (
     custom_exam_name.strip()
-    if custom_exam_name
+    if custom_exam_name.strip()
     else selected_exam
 )
 
@@ -145,7 +142,10 @@ final_exam_name = (
 
 try:
 
-    df = pd.read_excel(uploaded_file)
+    df = pd.read_excel(
+        uploaded_file,
+        dtype=str
+    )
 
 except Exception as e:
 
@@ -158,7 +158,11 @@ except Exception as e:
 # CLEAN COLUMN NAMES
 # =========================================================
 
-df.columns = df.columns.astype(str).str.strip()
+df.columns = (
+    df.columns
+    .astype(str)
+    .str.strip()
+)
 
 
 # =========================================================
@@ -171,7 +175,6 @@ STATUS_COL = "status"
 BANK_COL = "Name of Bank & Branch"
 ACC_COL = "Account No"
 IFSC_COL = "IFSC CODE"
-MOBILE_COL = "Mob. No."
 CITY_COL = "CITY"
 
 
@@ -189,13 +192,11 @@ required_cols = [
     CITY_COL
 ]
 
-
 missing = [
     column
     for column in required_cols
     if column not in df.columns
 ]
-
 
 if missing:
 
@@ -204,15 +205,6 @@ if missing:
     )
 
     st.stop()
-
-
-# =========================================================
-# MOBILE COLUMN
-# =========================================================
-
-if MOBILE_COL not in df.columns:
-
-    df[MOBILE_COL] = ""
 
 
 # =========================================================
@@ -351,7 +343,7 @@ def distance_allowance(km):
 
 
 # =========================================================
-# CREATE EXCEL FILE
+# CREATE FORMATTED EXCEL FILE
 # =========================================================
 
 def create_bordered_excel(
@@ -378,7 +370,6 @@ def create_bordered_excel(
 
         ws = writer.sheets["Final Summary"]
 
-
         # -------------------------------------------------
         # TITLE
         # -------------------------------------------------
@@ -402,9 +393,11 @@ def create_bordered_excel(
         )
 
         title.alignment = Alignment(
-            horizontal="center"
+            horizontal="center",
+            vertical="center"
         )
 
+        ws.row_dimensions[1].height = 25
 
         # -------------------------------------------------
         # BORDER
@@ -420,7 +413,6 @@ def create_bordered_excel(
             top=thin,
             bottom=thin
         )
-
 
         # -------------------------------------------------
         # FORMAT CELLS
@@ -443,7 +435,6 @@ def create_bordered_excel(
                         bold=True
                     )
 
-
         # -------------------------------------------------
         # COLUMN WIDTH
         # -------------------------------------------------
@@ -453,10 +444,53 @@ def create_bordered_excel(
             ws.max_column + 1
         ):
 
-            ws.column_dimensions[
-                get_column_letter(col)
-            ].width = 22
+            column_letter = get_column_letter(col)
 
+            max_length = 0
+
+            for cell in ws[column_letter]:
+
+                if cell.value is not None:
+
+                    max_length = max(
+                        max_length,
+                        len(str(cell.value))
+                    )
+
+            ws.column_dimensions[
+                column_letter
+            ].width = min(
+                max(max_length + 3, 15),
+                35
+            )
+
+        # -------------------------------------------------
+        # HEADER FORMATTING
+        # -------------------------------------------------
+
+        header_row = start_row + 1
+
+        for cell in ws[header_row]:
+
+            cell.font = Font(
+                bold=True,
+                color="FFFFFF"
+            )
+
+            cell.fill = __import__(
+                "openpyxl"
+            ).styles.PatternFill(
+                fill_type="solid",
+                fgColor="7B1E1E"
+            )
+
+            cell.alignment = Alignment(
+                horizontal="center",
+                vertical="center",
+                wrap_text=True
+            )
+
+        ws.freeze_panes = "A5"
 
     output.seek(0)
 
@@ -470,11 +504,6 @@ def create_bordered_excel(
 if "assignments" not in st.session_state:
 
     st.session_state.assignments = []
-
-
-if "officer_distance" not in st.session_state:
-
-    st.session_state.officer_distance = {}
 
 
 # =========================================================
@@ -498,9 +527,6 @@ st.markdown(
 
 cities = sorted(
     df[CITY_COL]
-    .dropna()
-    .astype(str)
-    .str.strip()
     .loc[lambda x: x != ""]
     .unique()
 )
@@ -544,9 +570,6 @@ city_df = df[
 
 officers = sorted(
     city_df[NAME_COL]
-    .dropna()
-    .astype(str)
-    .str.strip()
     .loc[lambda x: x != ""]
     .unique()
 )
@@ -584,21 +607,15 @@ if selected_officers:
         unsafe_allow_html=True
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # LOOP THROUGH SELECTED OFFICERS
-    # =====================================================
+    # -----------------------------------------------------
 
     for officer in selected_officers:
 
         officer_rows = city_df[
             city_df[NAME_COL] == officer
         ]
-
-
-        # -------------------------------------------------
-        # SAFETY CHECK
-        # -------------------------------------------------
 
         if officer_rows.empty:
 
@@ -608,9 +625,7 @@ if selected_officers:
 
             continue
 
-
         row = officer_rows.iloc[0]
-
 
         # -------------------------------------------------
         # GROUP
@@ -620,7 +635,6 @@ if selected_officers:
             row[GROUP_COL]
         ).strip().upper()
 
-
         # -------------------------------------------------
         # STATUS
         # -------------------------------------------------
@@ -629,17 +643,11 @@ if selected_officers:
             row[STATUS_COL]
         ).strip().lower()
 
-
-        # -------------------------------------------------
-        # DISPLAY STATUS
-        # -------------------------------------------------
-
         display_status = (
             status.capitalize()
             if status
             else "Unknown"
         )
-
 
         # -------------------------------------------------
         # EXPANDER
@@ -649,10 +657,9 @@ if selected_officers:
             f"👤 {officer} | Group {group} | {display_status}"
         ):
 
-
-            # =============================================
+            # ---------------------------------------------
             # DISTANCE
-            # =============================================
+            # ---------------------------------------------
 
             distance = st.number_input(
                 "Distance from HQ (KM)",
@@ -662,10 +669,9 @@ if selected_officers:
                 key=f"dist_{selected_city}_{officer}"
             )
 
-
-            # =============================================
+            # ---------------------------------------------
             # FULL SHIFT DAYS
-            # =============================================
+            # ---------------------------------------------
 
             full_days = st.number_input(
                 "Full Shift Days",
@@ -675,10 +681,9 @@ if selected_officers:
                 key=f"full_{selected_city}_{officer}"
             )
 
-
-            # =============================================
+            # ---------------------------------------------
             # SINGLE SHIFT DAYS
-            # =============================================
+            # ---------------------------------------------
 
             single_days = st.number_input(
                 "Single Shift Days",
@@ -688,27 +693,27 @@ if selected_officers:
                 key=f"single_{selected_city}_{officer}"
             )
 
-
-            # =============================================
+            # ---------------------------------------------
             # ADD / UPDATE
-            # =============================================
+            # ---------------------------------------------
 
             if st.button(
                 "Add / Update",
                 key=f"add_{selected_city}_{officer}"
             ):
 
-
                 # -----------------------------------------
-                # REMOVE OLD ENTRY
+                # REMOVE OLD ENTRY FOR SAME OFFICER
                 # -----------------------------------------
 
                 st.session_state.assignments = [
                     a
                     for a in st.session_state.assignments
-                    if a["Officer"] != officer
+                    if not (
+                        a["Name of Inspecting Officer"] == officer
+                        and a["City"] == selected_city
+                    )
                 ]
-
 
                 # -----------------------------------------
                 # DISTANCE ALLOWANCE
@@ -718,16 +723,13 @@ if selected_officers:
                     distance
                 )
 
-
                 # -----------------------------------------
                 # TOTAL DAYS
                 # -----------------------------------------
 
                 total_days = (
-                    full_days +
-                    single_days
+                    full_days + single_days
                 )
-
 
                 # -----------------------------------------
                 # REMUNERATION
@@ -740,14 +742,13 @@ if selected_officers:
                     status
                 )
 
-
                 # -----------------------------------------
                 # ADD ASSIGNMENT
                 # -----------------------------------------
 
                 st.session_state.assignments.append({
 
-                    "Officer": officer,
+                    "Name of Inspecting Officer": officer,
 
                     "City": row[CITY_COL],
 
@@ -760,11 +761,6 @@ if selected_officers:
                     "Account No": row[ACC_COL],
 
                     "IFSC Code": row[IFSC_COL],
-
-                    "Mobile No": row.get(
-                        MOBILE_COL,
-                        ""
-                    ),
 
                     "Distance (KM)": distance,
 
@@ -782,15 +778,9 @@ if selected_officers:
 
                 })
 
-
-                # -----------------------------------------
-                # SUCCESS MESSAGE
-                # -----------------------------------------
-
                 st.success(
                     f"{officer} updated successfully."
                 )
-
 
     st.markdown(
         "</div>",
@@ -808,20 +798,18 @@ if st.session_state.assignments:
         st.session_state.assignments
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # GRAND TOTAL
-    # =====================================================
+    # -----------------------------------------------------
 
     summary["Grand Total"] = (
-        summary["Remuneration"] +
-        summary["Distance Allowance"]
+        summary["Remuneration"]
+        + summary["Distance Allowance"]
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # SERIAL NUMBER
-    # =====================================================
+    # -----------------------------------------------------
 
     summary.insert(
         0,
@@ -832,22 +820,20 @@ if st.session_state.assignments:
         )
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # COLUMN ORDER
-    # =====================================================
+    # -----------------------------------------------------
 
     summary = summary[
         [
             "Sl. No.",
-            "Officer",
+            "Name of Inspecting Officer",
             "City",
             "Group",
             "Status",
             "Bank Name & Branch",
             "Account No",
             "IFSC Code",
-            "Mobile No",
             "Distance (KM)",
             "Full Shift Days",
             "Single Shift Days",
@@ -858,10 +844,9 @@ if st.session_state.assignments:
         ]
     ]
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # DISPLAY SUMMARY
-    # =====================================================
+    # -----------------------------------------------------
 
     st.markdown(
         "### 📊 Final Summary"
@@ -869,13 +854,13 @@ if st.session_state.assignments:
 
     st.dataframe(
         summary,
-        use_container_width=True
+        use_container_width=True,
+        hide_index=True
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # CREATE EXCEL
-    # =====================================================
+    # -----------------------------------------------------
 
     excel_file = create_bordered_excel(
         summary,
@@ -883,16 +868,20 @@ if st.session_state.assignments:
         exam_year
     )
 
-
-    # =====================================================
+    # -----------------------------------------------------
     # DOWNLOAD BUTTON
-    # =====================================================
+    # -----------------------------------------------------
+
+    safe_exam_name = "".join(
+        c if c.isalnum() or c in (" ", "-", "_") else "_"
+        for c in final_exam_name
+    ).strip()
 
     st.download_button(
         "⬇ Download Final Summary (Excel)",
         data=excel_file,
         file_name=(
-            f"{final_exam_name}_"
+            f"{safe_exam_name}_"
             f"{exam_year}_"
             f"Final_Summary.xlsx"
         ),
@@ -900,4 +889,11 @@ if st.session_state.assignments:
             "application/vnd.openxmlformats-officedocument."
             "spreadsheetml.sheet"
         )
+    )
+
+else:
+
+    st.info(
+        "Select an inspecting officer, enter duty details, "
+        "and click Add / Update to generate the final summary."
     )
